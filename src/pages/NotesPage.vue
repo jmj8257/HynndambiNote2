@@ -147,11 +147,39 @@ function handleNodeUpdate(updatedNode: NoteNode) {
 }
 
 // 슬래시 메뉴 표시
-function handleSlashMenu(data: { top: number; left: number; nodeId: string }) {
+function handleSlashMenu(data: { top: number; left: number; nodeId: string; cursorPos?: number }) {
   activeNodeId.value = data.nodeId;
-  menuPosition.value = { top: data.top, left: data.left };
+  
+  // 메뉴 위치 계산 - 화면 경계 고려
+  let top = data.top;
+  let left = data.left;
+  
+  // 화면 하단 경계 확인
+  const MAX_MENU_HEIGHT = 400; // SlashMenu 최대 높이
+  if (top + MAX_MENU_HEIGHT > window.innerHeight) {
+    top = Math.max(20, window.innerHeight - MAX_MENU_HEIGHT - 20);
+  }
+  
+  // 화면 우측 경계 확인
+  const MAX_MENU_WIDTH = 320; // SlashMenu 너비
+  if (left + MAX_MENU_WIDTH > window.innerWidth) {
+    left = Math.max(20, window.innerWidth - MAX_MENU_WIDTH - 20);
+  }
+  
+  menuPosition.value = { top, left };
   menuMode.value = 'slash';
   showNodeMenu.value = true;
+  
+  // 커서 위치 정보 저장 (향후 슬래시 문자 제거에 사용)
+  if (data.cursorPos !== undefined) {
+    const nodeIndex = nodes.value.findIndex(n => n.id === data.nodeId);
+    if (nodeIndex > -1) {
+      nodes.value[nodeIndex].metadata = {
+        ...nodes.value[nodeIndex].metadata,
+        tempSlashPos: data.cursorPos
+      };
+    }
+  }
 }
 
 // 노드 메뉴 표시
@@ -210,8 +238,24 @@ function handleMenuSelect(data: { type?: string; action?: string; metadata?: any
         });
       }, 0);
     } else {
-      // 현재 노드에 내용이 있는 경우 - 슬래시('/') 텍스트 제거
-      if (selectedNode.content === '/') {
+      // 현재 노드에 내용이 있고 텍스트 중간에 슬래시가 있는 경우
+      if (selectedNode.metadata?.tempSlashPos !== undefined) {
+        const slashPos = selectedNode.metadata.tempSlashPos;
+        
+        // 슬래시 문자 제거
+        if (slashPos > 0 && selectedNode.content.charAt(slashPos - 1) === '/') {
+          const content = selectedNode.content;
+          selectedNode.content = content.substring(0, slashPos - 1) + content.substring(slashPos);
+          
+          // 임시 정보 제거
+          const { tempSlashPos, ...restMetadata } = selectedNode.metadata;
+          selectedNode.metadata = restMetadata;
+          
+          handleNodeUpdate(selectedNode);
+        }
+      } 
+      // 노드 내용이 정확히 '/'인 경우 (기존 로직 유지)
+      else if (selectedNode.content === '/') {
         selectedNode.content = '';
         handleNodeUpdate(selectedNode);
       }

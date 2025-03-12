@@ -230,19 +230,27 @@ function handleNodeClick(event: MouseEvent) {
 function handleContentInput(event: Event) {
   const target = event.target as HTMLElement;
   const content = target.textContent || '';
-
+  const selection = window.getSelection();
+  
   // 내용 업데이트
   localNode.value.content = content;
   emit('update', localNode.value);
 
-  // 슬래시 명령 감지
-  if (content === '/') {
-    const rect = target.getBoundingClientRect();
-    emit('slash-triggered', {
-      top: rect.bottom,
-      left: rect.left,
-      nodeId: props.node.id
-    });
+  // 슬래시 명령 감지 - 현재 커서 위치에서 슬래시 입력 감지
+  if (selection && selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    const cursorPos = range.startOffset;
+    
+    // 커서 위치 바로 앞 문자가 슬래시인지 확인
+    if (cursorPos > 0 && content.charAt(cursorPos - 1) === '/') {
+      const rect = range.getBoundingClientRect();
+      emit('slash-triggered', {
+        top: rect.bottom || target.getBoundingClientRect().bottom,
+        left: rect.left || target.getBoundingClientRect().left,
+        nodeId: props.node.id,
+        cursorPos: cursorPos
+      });
+    }
   }
 }
 
